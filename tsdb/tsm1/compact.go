@@ -1141,6 +1141,8 @@ func (c *Compactor) write(path string, iter KeyIterator, throttle bool) (err err
 		}
 	}()
 
+	keyTimeRanges := make(map[string][]TimeRange)
+
 	for iter.Next() {
 		c.mu.RLock()
 		enabled := c.snapshotsEnabled || c.compactionsEnabled
@@ -1160,6 +1162,14 @@ func (c *Compactor) write(path string, iter KeyIterator, throttle bool) (err err
 		if minTime > maxTime {
 			return fmt.Errorf("invalid index entry for block. min=%d, max=%d", minTime, maxTime)
 		}
+
+		// Check overlapping blocks.
+		for _, r := range keyTimeRanges[string(key)] {
+			if r.Overlaps(minTime, maxTime) {
+				return fmt.Errorf("block overlaps with existing block: key=%q (%d-%d) <=> (%d-%d)", string(key), minTime, maxTime, r.Min, r.Max)
+			}
+		}
+		keyTimeRanges[string(key)] = append(keyTimeRanges[string(key)], TimeRange{Min: minTime, Max: maxTime})
 
 		// Write the key and value
 		if err := w.WriteBlock(key, minTime, maxTime, block); err == ErrMaxBlocksExceeded {

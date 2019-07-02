@@ -1098,6 +1098,22 @@ func (e *Engine) compactFull(ctx context.Context, grp CompactionGroup, wg *sync.
 	return false
 }
 
+// CompactGroup compacts a single group of files.
+// This occurs synchronously and should only be used by utilities and for debugging.
+func (e *Engine) CompactGroup(ctx context.Context, group CompactionGroup, level int, fast bool) {
+	strategy := &compactionStrategy{
+		group:     group,
+		logger:    e.logger,
+		fileStore: e.FileStore,
+		compactor: e.Compactor,
+		fast:      fast,
+		engine:    e,
+		level:     compactionLevel(level),
+		tracker:   e.compactionTracker,
+	}
+	strategy.Apply(ctx)
+}
+
 // compactionStrategy holds the details of what to do in a compaction.
 type compactionStrategy struct {
 	group CompactionGroup
